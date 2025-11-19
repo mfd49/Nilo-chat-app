@@ -57,7 +57,7 @@
             userNameDisplay.textContent = storedUser.name;
         }
 
-        // BURASI DÜZELTİLDİ! RENDER URL'Sİ EKLENDİ!
+        // BURASI DÜZELTİLDİ! RENDER URL'Sİ KESİN OLARAK EKLENDİ!
         const socket = io('https://nilo-chat-app.onrender.com'); 
 
         // 1. Kullanıcı Bağlanınca Adını Sunucuya Gönder (Gerekli!)
