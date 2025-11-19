@@ -34,46 +34,41 @@
         <div id="message"></div>
         <a href='/'>Kayıt olmak için buraya tıklayın.</a>
     </div>
-
     <script>
         document.getElementById('login-form').addEventListener('submit', async function(event) {
             event.preventDefault(); 
-
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const messageDiv = document.getElementById('message');
-            
-            messageDiv.textContent = 'Giriş Deneniyor...';
+            const email = document.getElementById('email').value;            
+            const password = document.getElementById('password').value;            
+            const messageDiv = document.getElementById('message');                        
+            messageDiv.textContent = 'Giriş Deneniyor...';            
             messageDiv.style.color = '#0000ff';
 
-            try {
-                const response = await fetch('http://localhost:3000/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
+            try {                
+                // *** DÜZELTİLMİŞ URL ***
+                const response = await fetch('https://nilo-chat-app.onrender.com/api/login', {                    
+                    method: 'POST',                    
+                    headers: { 'Content-Type': 'application/json' },                    
+                    body: JSON.stringify({ email, password })                
                 });
 
                 const data = await response.json();
 
-                if (response.ok) {
-                    messageDiv.textContent = data.message + ` My Chat odasına yönlendiriliyorsunuz...`;
-                    messageDiv.style.color = '#4caf50'; 
-                    
-                    localStorage.setItem('user', JSON.stringify(data.user)); 
-                    
-                    setTimeout(() => {
-                        window.location.href = 'dashboard.html'; 
-                    }, 1000); 
-                    
-                } else {
-                    messageDiv.textContent = `Hata: ${data.message}`;
-                    messageDiv.style.color = '#f44336'; 
+                if (response.ok) {                    
+                    messageDiv.textContent = data.message + ` My Chat odasına yönlendiriliyorsunuz...`;                    
+                    messageDiv.style.color = '#4caf50';                                         
+                    localStorage.setItem('user', JSON.stringify(data.user));                                         
+                    setTimeout(() => {                        
+                        window.location.href = 'dashboard.html';                     
+                    }, 1000);                                     
+                } else {                    
+                    messageDiv.textContent = `Hata: ${data.message}`;                    
+                    messageDiv.style.color = '#f44336';                 
                 }
-
-            } catch (error) {
+            } catch (error) {                
                 console.error('API Bağlantı Hatası:', error);
-                messageDiv.textContent = 'Bağlantı hatası: Sunucu çalışmıyor olabilir (http://localhost:3000).';
-                messageDiv.style.color = '#f44336';
+                // *** DÜZELTİLMİŞ HATA MESAJI ***
+                messageDiv.textContent = 'Bağlantı hatası: Sunucu çalışmıyor olabilir.';                
+                messageDiv.style.color = '#f44336';            
             }
         });
     </script>

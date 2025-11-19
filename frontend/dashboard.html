@@ -3,127 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nilo-Chat-App - Sohbet Odası</title>
-    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <title>My Chat - Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .main-wrapper { display: flex; width: 100%; max-width: 900px; height: 80vh; gap: 20px; }
-        .online-sidebar { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); width: 200px; display: flex; flex-direction: column; }
-        .chat-container { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); flex-grow: 1; display: flex; flex-direction: column; }
-        h1 { text-align: center; color: #3b5998; margin-top: 0; }
-        h3 { color: #008000; margin-top: 0; }
-        #messages { flex-grow: 1; border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; overflow-y: scroll; background: #fafafa; border-radius: 5px; }
-        #messages li { list-style: none; padding: 5px 0; border-bottom: 1px dotted #eee; }
-        .online-list li { color: #008000; font-weight: bold; list-style: disc; margin-left: 20px; }
-        .message-form { display: flex; }
-        #m { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 5px 0 0 5px; }
-        button { padding: 10px 15px; background-color: #3b5998; color: white; border: none; border-radius: 0 5px 5px 0; cursor: pointer; }
-        .username { font-weight: bold; color: #4682b4; }
-        .time { font-size: 0.7em; color: #999; margin-left: 10px; }
-        .logout-btn { margin-top: 10px; padding: 5px 10px; background-color: #dc3545; border-radius: 5px; font-size: 0.9em; align-self: flex-end;}
+        body { font-family: Arial, sans-serif; background-color: #f0fff0; display: flex; min-height: 100vh; margin: 0; color: #333; }
+        .sidebar { width: 200px; background-color: #008000; color: white; padding: 20px; box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); }
+        .sidebar h2 { margin-top: 0; border-bottom: 1px solid #3cb371; padding-bottom: 10px; }
+        .sidebar ul { list-style: none; padding: 0; margin: 20px 0; }
+        .sidebar ul li { padding: 8px 0; border-bottom: 1px dashed #3cb371; }
+        .sidebar button { width: 100%; padding: 10px; background-color: #ff4500; color: white; border: none; border-radius: 6px; cursor: pointer; transition: background-color 0.3s; margin-top: 20px; }
+        .sidebar button:hover { background-color: #ff6347; }
+        .main-content { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; }
+        #welcome-message { font-size: 1.5em; color: #008000; margin-bottom: 20px; }
+        .chat-window { flex-grow: 1; border: 1px solid #ccc; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; background: #fff; }
+        #messages { list-style: none; padding: 10px; margin: 0; overflow-y: auto; flex-grow: 1; }
+        #messages li { padding: 8px 10px; border-bottom: 1px dotted #eee; }
+        .input-area { display: flex; padding: 10px; border-top: 1px solid #ccc; }
+        #message-input { flex-grow: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px 0 0 6px; }
+        #send-button { padding: 10px 15px; background-color: #008000; color: white; border: none; border-radius: 0 6px 6px 0; cursor: pointer; transition: background-color 0.3s; }
+        #send-button:hover { background-color: #3cb371; }
     </style>
 </head>
 <body>
-    <div class="main-wrapper">
-        <div class="online-sidebar">
-            <h3>🟢 Çevrimiçi Kullanıcılar</h3>
-            <ul id="online-users" class="online-list">
+    <div class="sidebar">
+        <h2 id="welcome-message"></h2>
+        <h2>Aktif Kullanıcılar</h2>
+        <ul id="user-list">
             </ul>
-        </div>
-        
-        <div class="chat-container">
-            <button class="logout-btn" onclick="logout()">Çıkış Yap (<span id="user-name"></span>)</button>
-            <h1>Nilo-Chat-App Sohbet Odası</h1>
-            <ul id="messages"></ul>
-            <form class="message-form" id="chat-form">
-                <input id="m" autocomplete="off" placeholder="Mesajınızı buraya yazın..." />
-                <button>Gönder</button>
-            </form>
+        <button id="logout-button">Çıkış Yap</button>
+    </div>
+    <div class="main-content">
+        <div class="chat-window">
+            <ul id="messages">
+                </ul>
+            <div class="input-area">
+                <input type="text" id="message-input" placeholder="Mesajınızı yazın...">
+                <button id="send-button">Gönder</button>
+            </div>
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.js"></script>
     <script>
-        const storedUser = JSON.parse(localStorage.getItem('user'));
-        const messages = document.getElementById('messages');
-        const form = document.getElementById('chat-form');
-        const input = document.getElementById('m');
-        const userNameDisplay = document.getElementById('user-name');
-        const onlineUsersList = document.getElementById('online-users');
-
-        if (!storedUser || !storedUser.name) {
-            window.location.href = 'login.html'; 
-        } else {
-            userNameDisplay.textContent = storedUser.name;
+        // Kullanıcı bilgisi localStorage'dan alınıyor...
+        const user = JSON.parse(localStorage.getItem('user'));
+        if (!user) {
+            window.location.href = 'login.html'; // Giriş yapılmadıysa yönlendir
         }
 
-        // KESİN VE DOĞRU RENDER URL'Sİ:
-        const socket = io('https://nilo-chat-app.onrender.com'); 
+        // *** DÜZELTİLMİŞ URL ***
+        const socket = io('https://nilo-chat-app.onrender.com');
 
-        // 1. Kullanıcı Bağlanınca Adını Sunucuya Gönder (Gerekli!)
-        socket.on('connect', () => {
-             socket.emit('register user', storedUser.name);
-        });
+        document.getElementById('welcome-message').textContent = `Hoşgeldiniz, ${user.username}!`;
+
+        // Diğer Socket.IO kodları buraya devam ediyor...
+        socket.emit('login', { username: user.username });
         
-        // 2. Çevrimiçi Kullanıcı Listesini Al ve Güncelle
-        socket.on('online users', (userList) => {
-            onlineUsersList.innerHTML = '';
-            userList.forEach(user => {
-                const item = document.createElement('li');
-                item.textContent = user;
-                onlineUsersList.appendChild(item);
-            });
+        // Mesaj gönderme, alma ve listeleme fonksiyonları...
+        document.getElementById('send-button').addEventListener('click', () => {
+            const messageInput = document.getElementById('message-input');
+            const message = messageInput.value.trim();
+            if (message) {
+                socket.emit('chat message', { username: user.username, message: message });
+                messageInput.value = '';
+            }
         });
 
-
-        // 3. Sohbet Geçmişini Yükle
-        socket.on('history', (historyMessages) => {
-            messages.innerHTML = '';
-            historyMessages.forEach(msg => {
-                addMessage(msg.name, msg.text, false, msg.time);
-            });
-        });
-
-
-        socket.on('welcome', (data) => {
-             addMessage('SİSTEM', data.message, true);
-        });
-
-        // Backend'den gelen yeni mesajı al
         socket.on('chat message', (msg) => {
-            addMessage(msg.name, msg.text, false, msg.time); 
-        });
-
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            if (input.value) {
-                socket.emit('chat message', { 
-                    name: storedUser.name, 
-                    message: input.value
-                });
-                input.value = '';
-            }
-        });
-
-        function addMessage(user, text, isSystem = false, time = '') {
+            const messages = document.getElementById('messages');
             const item = document.createElement('li');
-            let content = '';
-            
-            if (isSystem) {
-                content = `<span style="color: red;">[${user}]</span> ${text}`;
-            } else {
-                content = `<span class="username">${user}:</span> ${text}<span class="time">${time}</span>`;
-            }
-
-            item.innerHTML = content;
+            item.textContent = `${msg.username}: ${msg.message}`;
             messages.appendChild(item);
-            
             messages.scrollTop = messages.scrollHeight;
-        }
+        });
 
-        function logout() {
-            localStorage.removeItem('user'); 
-            window.location.href = 'login.html'; 
-        }
+        // Kullanıcı listesi güncellemeleri
+        socket.on('update users', (users) => {
+            const userList = document.getElementById('user-list');
+            userList.innerHTML = ''; // Listeyi temizle
+            users.forEach(username => {
+                const item = document.createElement('li');
+                item.textContent = username;
+                userList.appendChild(item);
+            });
+        });
+
+        // Çıkış (Logout) fonksiyonu
+        document.getElementById('logout-button').addEventListener('click', () => {
+            localStorage.removeItem('user');
+            socket.disconnect();
+            window.location.href = 'login.html';
+        });
     </script>
 </body>
 </html>
