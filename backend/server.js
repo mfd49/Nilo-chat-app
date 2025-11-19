@@ -1,6 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Artık "bcryptjs" kullanılıyor
 const jwt = require('jsonwebtoken');
 const socketio = require('socket.io');
 const http = require('http'); 
@@ -14,10 +14,9 @@ app.use(express.json());
 app.use(cors()); 
 
 // Socket.IO Kurulumu
-// YENİ VE KESİN CORS DÜZELTMESİ BURADA!
 const io = socketio(server, {
     cors: {
-        // Yeni Netlify URL'leri ve eskileri, bağlantıya izin verilen kaynaklar.
+        // Yeni Netlify URL'leri burada (Son düzeltmeler)
         origin: [
             "https://melodious-capybara-603ee8.netlify.app", 
             "https://teal-pony-3104ac.netlify.app" 
