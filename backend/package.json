@@ -1,25 +1,24 @@
 {
-  "name": "nilo-chat-backend",
+  "name": "backend",
   "version": "1.0.0",
-  "description": "Nilo Chat App Backend Server",
+  "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [
-    "chat",
-    "socket.io",
-    "node",
-    "mongodb"
-  ],
+  "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": "16.x"
+  },
   "dependencies": {
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "mongoose": "^8.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.0.3",
     "socket.io": "^4.7.4"
   }
 }
