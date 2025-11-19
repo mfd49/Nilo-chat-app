@@ -1,1 +1,5 @@
-/* /login.html 200
+# Kök adresi login.html'e yönlendirir (404 hatasını çözer)
+/ /login.html 200
+
+# Giriş yaptıktan sonraki tüm bilinmeyen rotaları dashboard.html'e yönlendirir
+/dashboard.html /dashboard.html 200
