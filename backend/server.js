@@ -1,156 +1,132 @@
-// server.js - Nilo-Chat-App Backend (MongoDB devre dışı, Dosya tabanlı Kayıt)
-
 const express = require('express');
-const cors = require('cors');
-const fs = require('fs'); // Dosya okuma/yazma kütüphanesi
+const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const socketio = require('socket.io');
 const http = require('http'); 
-const { Server } = require("socket.io"); 
+const cors = require('cors');
 
-const app = express(); 
-const PORT = 3000;
-const USERS_FILE = 'users.json'; // Kullanıcı verilerini saklamak için dosya adı
-
-// Express uygulamasını HTTP sunucusuna bağla ve Socket.IO'yu kur
+const app = express();
 const server = http.createServer(app); 
-const io = new Server(server, { 
-    cors: { 
-        origin: "null" 
-    } 
-});
 
-// Middleware'ler
+// Middleware
+app.use(express.json());
 app.use(cors()); 
-app.use(express.json()); 
 
-
-// --- Dosya Tabanlı Kullanıcı İşlevleri ---
-
-// Kullanıcı verilerini dosyadan okur
-const getUsers = () => {
-    try {
-        const data = fs.readFileSync(USERS_FILE);
-        return JSON.parse(data);
-    } catch (error) {
-        // Dosya yoksa veya bozuksa boş bir dizi döner
-        return [];
-    }
-};
-
-// Kullanıcı verilerini dosyaya yazar
-const saveUsers = (users) => {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-};
-
-// --- API ROTASI: Kullanıcı Kayıt (Dosya Tabanlı) ---
-app.post('/api/register', async (req, res) => {
-    const { name, email, password } = req.body;
-    
-    if (!name || !email || !password) {
-        return res.status(400).json({ success: false, message: 'Tüm alanlar zorunludur.' });
-    }
-    
-    const users = getUsers();
-    
-    if (users.find(user => user.email === email)) {
-        return res.status(409).json({ success: false, message: 'Bu e-posta zaten kayıtlı.' });
-    }
-    
-    try {
-        const hashedPassword = await bcrypt.hash(password, 10); 
-        const newUser = { id: Date.now(), name, email, password: hashedPassword };
-        users.push(newUser);
-        saveUsers(users);
-        
-        res.status(201).json({ success: true, message: 'Kayıt başarılı!', user: { id: newUser.id, name, email } });
-    } catch (error) {
-        console.error('Kayıt sırasında hata:', error);
-        res.status(500).json({ success: false, message: 'Sunucu hatası.' });
+// Socket.IO Kurulumu
+// YENİ VE KESİN CORS DÜZELTMESİ BURADA!
+const io = socketio(server, {
+    cors: {
+        // Yeni Netlify URL'leri ve eskileri, bağlantıya izin verilen kaynaklar.
+        origin: [
+            "https://melodious-capybara-603ee8.netlify.app", 
+            "https://teal-pony-3104ac.netlify.app" 
+        ],
+        methods: ["GET", "POST"]
     }
 });
 
-// --- API ROTASI: Kullanıcı Girişi (LOGIN) (Dosya Tabanlı) ---
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-    
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: 'E-posta ve şifre gereklidir.' });
-    }
-    
-    const users = getUsers();
-    const user = users.find(u => u.email === email);
-    
-    if (!user) {
-        return res.status(401).json({ success: false, message: 'E-posta veya şifre hatalı.' }); 
-    }
-    
-    try {
-        const passwordMatch = await bcrypt.compare(password, user.password);
-        if (passwordMatch) {
-            res.status(200).json({ 
-                success: true, 
-                message: 'Giriş başarılı!', 
-                user: { id: user.id, name: user.name, email: user.email } 
-            });
-        } else {
-            res.status(401).json({ success: false, message: 'E-posta veya şifre hatalı.' });
-        }
-    } catch (error) {
-        console.error('Giriş sırasında sunucu hatası:', error); 
-        res.status(500).json({ success: false, message: 'Sunucu hatası.' });
-    }
+// MongoDB Bağlantısı
+// Bağlantı dizeniz Render ortam değişkenlerinden alınacak
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB\'ye başarıyla bağlandı.'))
+    .catch(err => console.error('MongoDB bağlantı hatası:', err));
+
+// Kullanıcı Şeması
+const UserSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true }
 });
 
+const User = mongoose.model('User', UserSchema);
 
-// --- Online Kullanıcı Takibi (Socket.IO) ---
-const onlineUsers = {}; 
+// Aktif Kullanıcıları Takip Etmek İçin
+let activeUsers = {}; // { id: username }
 
-// Tüm kullanıcılara güncel çevrimiçi listesini gönderen fonksiyon
-function updateOnlineUsers() {
-    const userList = Object.keys(onlineUsers);
-    io.emit('online users', userList);
-    console.log(`[ONLINE] Şu anki kullanıcılar: ${userList.join(', ')}`);
-}
+// Socket.IO Bağlantıları
+io.on('connection', (socket) => {
+    console.log('Yeni bir kullanıcı bağlandı:', socket.id);
 
-
-// --- Socket.IO ve Express için Bağlantı Yönetimi (Canlı Sohbet) ---
-io.on('connection', async (socket) => { 
-    console.log(`Yeni kullanıcı bağlandı: ${socket.id}`);
-    
-    // 1. Kullanıcı Bağlanınca Adını Kaydet ve Listeyi Güncelle
-    socket.on('register user', (userName) => {
-        socket.userName = userName;
-        onlineUsers[userName] = socket.id;
-        updateOnlineUsers();
+    socket.on('login', ({ username }) => {
+        // Kullanıcıyı aktif listeye ekle
+        activeUsers[socket.id] = username;
+        // Tüm kullanıcılara listeyi güncelleme emri gönder
+        io.emit('update users', Object.values(activeUsers));
+        console.log(`${username} giriş yaptı. Aktif kullanıcılar: ${Object.values(activeUsers).length}`);
     });
 
-    socket.emit('welcome', { message: 'Nilo-Chat-App sunucusuna hoş geldiniz!' });
-
-    socket.on('chat message', (msg) => { 
-        const username = msg.name || 'Misafir';
-        const messageTime = new Date().toLocaleTimeString('tr-TR');
-        
-        // Mesajı tüm istemcilere yayınla
-        io.emit('chat message', { 
-            name: username, 
-            text: msg.message, 
-            time: messageTime 
-        }); 
-        console.log(`[MESAJ] ${username}: ${msg.message}`);
+    socket.on('chat message', (msg) => {
+        // Gelen mesajı tüm kullanıcılara geri gönder
+        io.emit('chat message', msg);
     });
 
     socket.on('disconnect', () => {
-        if (socket.userName) {
-            delete onlineUsers[socket.userName];
-            updateOnlineUsers();
-            console.log(`Kullanıcı bağlantıyı kesti: ${socket.userName}`);
-        }
+        const disconnectedUsername = activeUsers[socket.id];
+        delete activeUsers[socket.id];
+        // Kullanıcı listesini güncelle
+        io.emit('update users', Object.values(activeUsers));
+        console.log(`Kullanıcı ayrıldı: ${disconnectedUsername}. Aktif kullanıcılar: ${Object.values(activeUsers).length}`);
     });
 });
 
+// Kayıt Yolu
+app.post('/api/register', async (req, res) => {
+    try {
+        const { username, email, password } = req.body;
+        // Şifreyi şifrele
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        const newUser = new User({ username, email, password: hashedPassword });
+        await newUser.save();
+        
+        res.status(201).json({ message: 'Kayıt başarıyla tamamlandı.' });
+    } catch (err) {
+        if (err.code === 11000) {
+            res.status(400).json({ message: 'Bu e-posta veya kullanıcı adı zaten kullanımda.' });
+        } else {
+            console.error('Kayıt Hatası:', err);
+            res.status(500).json({ message: 'Kayıt sırasında bir hata oluştu.' });
+        }
+    }
+});
 
-// Sunucuyu Başlat
-server.listen(PORT, () => { 
-    console.log(`Nilo-Chat-App Backend sunucusu http://localhost:${PORT} adresinde çalışıyor...`);
-    console.log(`Kayıtlar bu klasördeki ${USERS_FILE} dosyasına yazılacaktır. (MongoDB devre dışıdır)`);
+// Giriş Yolu
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(400).json({ message: 'E-posta veya şifre hatalı.' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(400).json({ message: 'E-posta veya şifre hatalı.' });
+        }
+
+        // Token oluşturma (Gerekli değilse kaldırılabilir, ama oturum için faydalı)
+        const token = jwt.sign({ userId: user._id }, 'gizli-anahtar', { expiresIn: '1h' });
+
+        res.status(200).json({ 
+            message: 'Giriş başarılı!', 
+            token,
+            user: {
+                id: user._id,
+                username: user.username,
+                email: user.email
+            }
+        });
+    } catch (err) {
+        console.error('Giriş Hatası:', err);
+        res.status(500).json({ message: 'Giriş sırasında bir hata oluştu.' });
+    }
+});
+
+// Sunucuyu Başlatma
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Sunucu http://localhost:${PORT} adresinde çalışıyor.`);
 });
